@@ -41,15 +41,17 @@ return exitCode;
 
 // END OF PROGRAM
 
-int Resize(Options o) {
+void Resize(Options o) {
     // shows user which options are being used by the program
     AnsiConsole.MarkupLine($"Options: ");
     AnsiConsole.Write(new JsonText(o.ToString()));
     AnsiConsole.WriteLine();
-    
+
     // when input is a single file, just resize it and be done with
-    if (File.Exists(o.Source))
-        return exitCode = ResizeFile(o.Source, o);
+    if (File.Exists(o.Source)) {
+        ResizeFile(o.Source, o);
+        return;
+    }
 
     // get source dir and pattern from Source argument (uses current dir if no directory is passed)
     var dir = Path.GetDirectoryName(o.Source);
@@ -92,13 +94,13 @@ int Resize(Options o) {
         AnsiConsole.MarkupLine("[yellow on green] Job completed! [/]");
         File.Delete(o.Job);
     }
-    return 0;
 }
 
-int ResizeFile(string filename, Options o) {
+void ResizeFile(string filename, Options o) {
     if (!File.Exists(filename)) {
         AnsiConsole.MarkupLine($"[yellow on red] {filename} [/][white on gray] does not exist [/]\r\n");
-        return -2;
+        exitCode = -2;
+        return;
     }
     watch.Restart();
     var markup = $"[yellow on green] {count} [/][white on gray] files resized [/]{(o.HasJob() ? $"[black on olive] <ESC> to quit and save job [/]" : "")}";
@@ -111,8 +113,8 @@ int ResizeFile(string filename, Options o) {
     AnsiConsole.Markup($"[gray]Processing:[/] ");
     AnsiConsole.Write(new TextPath($"{fi.FullName}..."));
 
-    // guarantees destination dir exists and creates the file in its original subdir hierarchy
-    var relativeFilename = GetRelativePath(filename, o); // maintain same dir hierarchy
+    // guarantees destination dir exists
+    var relativeFilename = GetRelativePath(filename, o); // maintains same dir hierarchy
     var dest = Path.Combine(o.Destination ?? "", relativeFilename);
     ForceDirectory(dest);
 
@@ -129,7 +131,7 @@ int ResizeFile(string filename, Options o) {
             break;
         case ConfirmResult.Escape:
             escHit = true;
-            return -1;
+            return;
         case ConfirmResult.Never:
             o.NeverOverwrite = true;
             break;
@@ -159,7 +161,6 @@ int ResizeFile(string filename, Options o) {
 
     AnsiConsole.MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
     count++;
-    return 0;
 }
 
 IEnumerable<string> EnumerateFiles(string dir, string filter, Options o) {

@@ -3,23 +3,16 @@ using PhotoSauce.MagicScaler;
 using Spectre.Console;
 using Spectre.Console.Json;
 using System.Diagnostics;
-using System.Net.Http.Headers;
+using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 var start = Stopwatch.GetTimestamp();
 var watch = Stopwatch.StartNew();
-var currentFile = "";
 var escHit = false;
 int count = 0, exitCode = 0, remainingFilesCount = 0;
 long totalBytes = 0, totalResizedBytes = 0;
 StatusContext statusContext;
-var validKeyMap = new Dictionary<ConsoleKey, ConfirmResult> {
-    [ConsoleKey.Y] = ConfirmResult.Yes,
-    [ConsoleKey.N] = ConfirmResult.No,
-    [ConsoleKey.A] = ConfirmResult.Always,
-    [ConsoleKey.E] = ConfirmResult.Never,
-    [ConsoleKey.Escape] = ConfirmResult.Escape,
-};
 
 // Let's welcome our user...
 AnsiConsole.Write(new FigletText("imgsizer"));
@@ -35,27 +28,18 @@ AnsiConsole.Status()
         // parse our options and call resize if valid
         Parser.Default.ParseArguments<Options>(args)
             .WithParsed(o => Resize(o))
-            .WithNotParsed(e => Error(e));
+            .WithNotParsed(_ => exitCode = 1);
     });
 
-// wrap it up and display ending message
-var remaining = remainingFilesCount == 0 ? "" : $"[white on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
-AnsiConsole.MarkupLine($"\r\n[white on gray] files processed [/][yellow on green] {count} [/][white on gray] total size [/][yellow on purple] {Size(totalBytes)} [/][white on gray] resized size [/][yellow on navy] {Size(totalResizedBytes)} [/]{remaining}[white on gray] runnnig time [/][yellow on blue] {Stopwatch.GetElapsedTime(start)} [/]");
+if (exitCode == 0) {
+    // wrap it up and display ending message
+    var remaining = remainingFilesCount == 0 ? "" : $"[white on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
+    AnsiConsole.MarkupLine($"\r\n[white on gray] files processed [/][yellow on green] {count} [/][white on gray] total size [/][yellow on purple] {Size(totalBytes)} [/][white on gray] resized size [/][yellow on navy] {Size(totalResizedBytes)} [/]{remaining}[white on gray] runnnig time [/][yellow on blue] {Stopwatch.GetElapsedTime(start)} [/]");
+}
 
 return exitCode;
 
-void Error(IEnumerable<Error> e) {
-    Console.Error.WriteLine(e);
-    exitCode = 1;   
-}
-
-ConfirmResult Confirm(string msg) {
-    AnsiConsole.MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
-    ConsoleKey key;
-    while (!validKeyMap!.ContainsKey(key = Console.ReadKey(true).Key)) { }
-    AnsiConsole.MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
-    return validKeyMap[key];
-}
+// END OF PROGRAM
 
 int Resize(Options o) {
     // shows user which options are being used by the program
@@ -117,7 +101,6 @@ int ResizeFile(string filename, Options o) {
         return -2;
     }
     watch.Restart();
-    currentFile = filename;
     var markup = $"[yellow on green] {count} [/][white on gray] files resized [/]{(o.HasJob() ? $"[black on olive] <ESC> to quit and save job [/]" : "")}";
     statusContext.Status(markup);
 
@@ -215,11 +198,19 @@ void ForceDirectory(string? dirOrFileName) {
 string GetRelativePath(string filename, Options o) =>
     Path.GetRelativePath(Path.GetDirectoryName(Path.GetFullPath(o.Source)) ?? "", Path.GetFullPath(filename));
 
-static string Size(long bytes, int unit = 1024) {
+string Size(long bytes, int unit = 1024) {
     // converts bytes to the "best-fit" unit of measurement (change unit to 1000 to use the new 1000 B =1 MB storage standard)
     if (bytes < unit) return $"{bytes} B"; 
     var exp = (int)(Math.Log(bytes) / Math.Log(unit));
     return $"{bytes / Math.Pow(unit, exp):F2} {("KMGTPE")[exp - 1]}B";
+}
+
+ConfirmResult Confirm(string msg) {
+    AnsiConsole.MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
+    ConsoleKey key;
+    while (ConfirmKeys.Map.ContainsKey(key = Console.ReadKey(true).Key)) { }
+    AnsiConsole.MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
+    return ConfirmKeys.Map[key];
 }
 
 /// <summary>
@@ -250,3 +241,14 @@ public class Options
 }
 
 enum ConfirmResult { Yes, No, Always, Never, Escape }
+
+static class ConfirmKeys
+{
+    public static Dictionary<ConsoleKey, ConfirmResult> Map { get; } = new() {
+        [ConsoleKey.Y] = ConfirmResult.Yes,
+        [ConsoleKey.N] = ConfirmResult.No,
+        [ConsoleKey.A] = ConfirmResult.Always,
+        [ConsoleKey.E] = ConfirmResult.Never,
+        [ConsoleKey.Escape] = ConfirmResult.Escape,
+    };
+}

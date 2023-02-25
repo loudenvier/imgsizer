@@ -59,12 +59,12 @@ int Resize(Options o) {
     // guarantees destination is a full path
     o.Destination = Path.GetFullPath(o.Destination ?? "");
     // if source == destination this is an "inplace" process 
-    var inplace = o.Destination == Path.GetFullPath(dir);
+    o.Inplace = o.Destination == Path.GetFullPath(dir);
 
     var remainingJobFiles = new List<string>();
     foreach (var file in EnumerateFiles(dir, filter, o)) {
         // don't process files in the destination folder in case it's a subdir of the source folder
-        if (!inplace && o.Destination != null && IsSubDir(Path.GetFullPath(o.Destination), Path.GetFullPath(file)))
+        if (!o.Inplace && o.Destination != null && IsSubDir(Path.GetFullPath(o.Destination), Path.GetFullPath(file)))
             continue;
         // check for <ESC> (to quit and optionally save the job)
         if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape) {
@@ -139,14 +139,18 @@ int ResizeFile(string filename, Options o) {
             goto case ConfirmResult.Yes;
         case ConfirmResult.Yes: 
             {
-                using var stm = new MemoryStream();
+                using Stream stm = o.Inplace ? new MemoryStream() : new FileStream(dest, FileMode.Create);
                 MagicImageProcessor.ProcessImage(filename, stm, new ProcessImageSettings {
                     Width = o.Width ?? 0,
                     Height = o.Height ?? 0,
                     ResizeMode = CropScaleMode.Max,
                 });
-                stm.Position = 0;
-                File.WriteAllBytes(dest, stm.ToArray());
+                if (stm is MemoryStream mem) {
+                    stm.Position = 0;
+                    File.WriteAllBytes(dest, mem.ToArray());
+                }
+                stm.Flush();
+                stm.Close();
             }
             break;
     }
@@ -208,7 +212,7 @@ string Size(long bytes, int unit = 1024) {
 ConfirmResult Confirm(string msg) {
     AnsiConsole.MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
     ConsoleKey key;
-    while (ConfirmKeys.Map.ContainsKey(key = Console.ReadKey(true).Key)) { }
+    while (!ConfirmKeys.Map.ContainsKey(key = Console.ReadKey(true).Key)) { }
     AnsiConsole.MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
     return ConfirmKeys.Map[key];
 }
@@ -221,6 +225,7 @@ public class Options
     public Options() { }
     [Value(0, Required = true, MetaName = "source", HelpText = "Source file/pattern")]
     public string Source { get; set; } = "";
+    public bool Inplace { get; set; }
     [Option('w', "width", HelpText = "Image's target width")]
     public int? Width { get; set; }
     [Option('h', "height", HelpText = "Image's target height")]

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "imgsizer": {
+      "commandName": "Project",
+      "commandLineArgs": "recursive1/*.jpg -w 400 -r -j teste -d recursive1 -o"
+    }
+  }
+}

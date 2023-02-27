@@ -3,8 +3,6 @@ using PhotoSauce.MagicScaler;
 using Spectre.Console;
 using Spectre.Console.Json;
 using System.Diagnostics;
-using System.Runtime.ExceptionServices;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 var start = Stopwatch.GetTimestamp();
@@ -16,7 +14,7 @@ StatusContext statusContext;
 
 // Let's welcome our user...
 AnsiConsole.Write(new FigletText("imgsizer"));
-AnsiConsole.MarkupLine($"Image[gray](re)[/]Sizer [yellow]{DateTime.Now.Year}[/]\r\n");
+AnsiConsole.MarkupLine($"                            Image[gray](re)[/]Sizer [yellow]{DateTime.Now.Year}[/]\r\n");
 
 // We process everything inside a "live" AnsiConsole Status message loop
 AnsiConsole.Status()
@@ -26,7 +24,11 @@ AnsiConsole.Status()
     .Start("Starting...", ctx => {
         statusContext = ctx;
         // parse our options and call resize if valid
-        var parser = new Parser(cfg => cfg.CaseInsensitiveEnumValues = true);
+        var parser = new Parser(cfg => {
+            cfg.CaseInsensitiveEnumValues = true;
+            cfg.AutoHelp = true;
+            cfg.HelpWriter = Console.Out;
+        });
         parser.ParseArguments<Options>(args)
             .WithParsed(o => Resize(o))
             .WithNotParsed(e => exitCode = 1);
@@ -242,7 +244,7 @@ public class Options
     public int? Width { get; set; }
     [Option('h', "height", HelpText = "Image's target height")]
     public int? Height { get; set; }
-    [Option('d', "dest", Default = "resized", HelpText = "Output path/directory (if it's '.' the source files will be overwritten)")]
+    [Option('d', "dest", Default = "resized", HelpText = "Output path/directory (if it's '.' performs inplace resizing)")]
     public string? Destination { get; set; } 
     [Option('o', "overwrite", Default = false, HelpText = "Automatically overwrites destination files")]
     public bool Overwrite { get; set; }

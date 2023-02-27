@@ -1,5 +1,5 @@
 # imgsizer
-Image (re)Sizer is a multiplatform .NET application to resize/shrink image files, either inplace or to a destination directory (preserving folder structure). It aims to be very vast and to keep as much image quality as possible. To that end it uses the amazing [MagicScaller](https://github.com/saucecontrol/PhotoSauce) high-performance, high-quality image processing pipeline for .NET library.
+Image (re)Sizer is a multiplatform .NET application to resize/shrink image files, either inplace or to a destination directory (preserving folder structure). It aims to be very vast and to keep as much image quality as possible. To that end it uses the amazing [MagicScaller](https://github.com/saucecontrol/PhotoSauce) high-performance, high-quality image processing pipeline library for .NET.
 
 ## Usage
 
@@ -28,8 +28,8 @@ ACCEPTED ARGUMENTS
 
   --whatif           Runs in simulation mode (output isn't written to disk)
 
-  -s, --scalemode    (Default: Off) (off, favorquality, favorspeed, turbo) Defines the mode that control speed vs.
-                     quality trade-offs for high-ratio scaling operations.
+  -s, --scalemode    (Default: Off) (off, favorquality, favorspeed, turbo) Defines the mode that 
+                     control speed vs. quality trade-offs for high-ratio scaling operations.
 
   --help             Display this help screen.
 

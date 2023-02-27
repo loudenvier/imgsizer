@@ -26,9 +26,10 @@ AnsiConsole.Status()
     .Start("Starting...", ctx => {
         statusContext = ctx;
         // parse our options and call resize if valid
-        Parser.Default.ParseArguments<Options>(args)
+        var parser = new Parser(cfg => cfg.CaseInsensitiveEnumValues = true);
+        parser.ParseArguments<Options>(args)
             .WithParsed(o => Resize(o))
-            .WithNotParsed(_ => exitCode = 1);
+            .WithNotParsed(e => exitCode = 1);
     });
 
 if (exitCode == 0) {
@@ -116,15 +117,18 @@ void ResizeFile(string filename, Options o) {
     // guarantees destination dir exists
     var relativeFilename = GetRelativePath(filename, o); // maintains same dir hierarchy
     var dest = Path.Combine(o.Destination ?? "", relativeFilename);
-    ForceDirectory(dest);
+    if (!o.WhatIf) 
+        ForceDirectory(dest);
 
     // check if it needs to ask to overwrite destination (will compute the size even if skipped)
     var confirmation = o switch 
     { 
+        { WhatIf: true}                             => ConfirmResult.Yes,
         { NeverOverwrite: true }                    => ConfirmResult.No, 
         { Overwrite: false } when File.Exists(dest) => Confirm($"The destination file already exists. Overwrite it? "),
         _                                           => ConfirmResult.Yes,
     };
+    long resizedBytes = 0;
     switch (confirmation) {
         case ConfirmResult.No:
             AnsiConsole.MarkupLine($"[black on red] File skipped! [/]");
@@ -141,22 +145,29 @@ void ResizeFile(string filename, Options o) {
             goto case ConfirmResult.Yes;
         case ConfirmResult.Yes: 
             {
-                using Stream stm = o.Inplace ? new MemoryStream() : new FileStream(dest, FileMode.Create);
+                using Stream stm = o.Inplace || o.WhatIf ? new MemoryStream() : new FileStream(dest, FileMode.Create);
                 MagicImageProcessor.ProcessImage(filename, stm, new ProcessImageSettings {
                     Width = o.Width ?? 0,
                     Height = o.Height ?? 0,
                     ResizeMode = CropScaleMode.Max,
+                    HybridMode = o.ScaleMode,
+
                 });
-                if (stm is MemoryStream mem) {
-                    stm.Position = 0;
-                    File.WriteAllBytes(dest, mem.ToArray());
+                if (!o.WhatIf) {
+                    if (stm is MemoryStream mem) {
+                        stm.Position = 0;
+                        File.WriteAllBytes(dest, mem.ToArray());
+                    }
+                } else {
+                    resizedBytes = stm.Length;
                 }
                 stm.Flush();
                 stm.Close();
             }
             break;
     }
-    var resizedBytes = new FileInfo(dest).Length;
+    if (!o.WhatIf) 
+        resizedBytes = new FileInfo(dest).Length;
     totalResizedBytes += resizedBytes;
 
     AnsiConsole.MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
@@ -240,6 +251,10 @@ public class Options
     public bool Recursive { get; set; }
     [Option('j', "job", Default = null, HelpText = "Allows pausing and resuming with named \"jobs\"")]
     public string? Job { get; set; }
+    [Option("whatif", HelpText = "Runs in simulation mode (output isn't written to disk)")]
+    public bool WhatIf { get; set; }
+    [Option('s', "scalemode", Default = HybridScaleMode.Off, HelpText = "(off, favorquality, favorspeed, turbo) Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations.")]
+    public HybridScaleMode ScaleMode { get; set; }
 
     public bool HasJob() => !String.IsNullOrWhiteSpace(Job);
 

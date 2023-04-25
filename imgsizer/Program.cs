@@ -1,6 +1,7 @@
 ﻿using CommandLine;
 using PhotoSauce.MagicScaler;
 using Spectre.Console;
+using static Spectre.Console.AnsiConsole;
 using Spectre.Console.Json;
 using System.Diagnostics;
 using System.Text.Json;
@@ -13,11 +14,11 @@ long totalBytes = 0, totalResizedBytes = 0;
 StatusContext statusContext;
 
 // Let's welcome our user...
-AnsiConsole.Write(new FigletText("imgsizer"));
-AnsiConsole.MarkupLine($"                            Image[gray](re)[/]Sizer [yellow]{DateTime.Now.Year}[/]\r\n");
+Write(new FigletText("imgsizer"));
+MarkupLine($"                            Image[gray](re)[/]Sizer [yellow]{DateTime.Now.Year}[/]\r\n");
 
 // We process everything inside a "live" AnsiConsole Status message loop
-AnsiConsole.Status()
+Status()
     .AutoRefresh(true)
     .Spinner(Spinner.Known.Pipe)
     .SpinnerStyle(Style.Parse("green bold"))
@@ -27,7 +28,7 @@ AnsiConsole.Status()
         var parser = new Parser(cfg => {
             cfg.CaseInsensitiveEnumValues = true;
             cfg.AutoHelp = true;
-            cfg.HelpWriter = Console.Out;
+            cfg.HelpWriter = System.Console.Out;
         });
         parser.ParseArguments<Options>(args)
             .WithParsed(o => Resize(o))
@@ -37,7 +38,11 @@ AnsiConsole.Status()
 if (exitCode == 0) {
     // wrap it up and display ending message
     var remaining = remainingFilesCount == 0 ? "" : $"[white on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
-    AnsiConsole.MarkupLine($"\r\n[white on gray] files processed [/][yellow on green] {count} [/][white on gray] total size [/][yellow on purple] {Size(totalBytes)} [/][white on gray] resized size [/][yellow on navy] {Size(totalResizedBytes)} [/]{remaining}[white on gray] runnnig time [/][yellow on blue] {Stopwatch.GetElapsedTime(start)} [/]");
+    MarkupLine(
+        $"\r\n[white on gray] files processed [/][yellow on green] {count} [/]" +
+        $"[white on gray] total size [/][yellow on purple] {Size(totalBytes)} [/]" +
+        $"[white on gray] resized size [/][yellow on navy] {Size(totalResizedBytes)} [/]{remaining}" +
+        $"[white on gray] runnnig time [/][yellow on blue] {Stopwatch.GetElapsedTime(start)} [/]");
 }
 
 return exitCode;
@@ -46,9 +51,9 @@ return exitCode;
 
 void Resize(Options o) {
     // shows user which options are being used by the program
-    AnsiConsole.MarkupLine($"Options: ");
-    AnsiConsole.Write(new JsonText(o.ToString()));
-    AnsiConsole.WriteLine();
+    MarkupLine($"Options: ");
+    Write(new JsonText(o.ToString()));
+    WriteLine();
 
     // when input is a single file, just resize it and be done with
     if (File.Exists(o.Source)) {
@@ -72,9 +77,9 @@ void Resize(Options o) {
         if (!o.Inplace && o.Destination != null && IsSubDir(Path.GetFullPath(o.Destination), Path.GetFullPath(file)))
             continue;
         // check for <ESC> (to quit and optionally save the job)
-        if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape) {
+        if (System.Console.KeyAvailable && System.Console.ReadKey(true).Key == ConsoleKey.Escape) {
             escHit = true;
-            AnsiConsole.MarkupLine($"[black on yellow] <ESC> [/][yellow on black] detected. [/]{(o.HasJob() ? "[gray]Saving job state...[/] " : "")}");
+            MarkupLine($"[black on yellow] <ESC> [/][yellow on black] detected. [/]{(o.HasJob() ? "[gray]Saving job state...[/] " : "")}");
             if (!o.HasJob()) 
                 // if no job name was provided just quit processing
                 break;
@@ -91,17 +96,17 @@ void Resize(Options o) {
     if (escHit && o.HasJob()) {
         // TODO: Could add some more info from the job (how many files were processed, time taken, etc.)
         File.WriteAllLines(o.Job!, remainingJobFiles);
-        AnsiConsole.MarkupLine($"[default]Job saved to: [/][yellow]\"{Path.GetFullPath(o.Job!)}\" [/]");
+        MarkupLine($"[default]Job saved to: [/][yellow]\"{Path.GetFullPath(o.Job!)}\" [/]");
     } else if (o.HasJob() && File.Exists(o.Job)) {
         // deletes the Job if it existed and the job was completed
-        AnsiConsole.MarkupLine("[yellow on green] Job completed! [/]");
+        MarkupLine("[yellow on green] Job completed! [/]");
         File.Delete(o.Job);
     }
 }
 
 void ResizeFile(string filename, Options o) {
     if (!File.Exists(filename)) {
-        AnsiConsole.MarkupLine($"[yellow on red] {filename} [/][white on gray] does not exist [/]\r\n");
+        MarkupLine($"[yellow on red] {filename} [/][white on gray] does not exist [/]\r\n");
         exitCode = -2;
         return;
     }
@@ -113,8 +118,8 @@ void ResizeFile(string filename, Options o) {
     var bytes = fi.Length;
     totalBytes += bytes;
 
-    AnsiConsole.Markup($"[gray]Processing:[/] ");
-    AnsiConsole.Write(new TextPath($"{fi.FullName}..."));
+    Markup($"[gray]Processing:[/] ");
+    Write(new TextPath($"{fi.FullName}..."));
 
     // guarantees destination dir exists
     var relativeFilename = GetRelativePath(filename, o); // maintains same dir hierarchy
@@ -133,7 +138,7 @@ void ResizeFile(string filename, Options o) {
     long resizedBytes = 0;
     switch (confirmation) {
         case ConfirmResult.No:
-            AnsiConsole.MarkupLine($"[black on red] File skipped! [/]");
+            MarkupLine($"[black on red] File skipped! [/]");
             break;
         case ConfirmResult.Escape:
             escHit = true;
@@ -172,7 +177,7 @@ void ResizeFile(string filename, Options o) {
         resizedBytes = new FileInfo(dest).Length;
     totalResizedBytes += resizedBytes;
 
-    AnsiConsole.MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
+    MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
     count++;
 }
 
@@ -181,10 +186,10 @@ IEnumerable<string> EnumerateFiles(string dir, string filter, Options o) {
     if (o.HasJob()) {
         var jobPath = Path.GetFullPath(o.Job!);
         if (File.Exists(o.Job)) {
-            AnsiConsole.MarkupLine($"[yellow on green] resuming job [/][yellow on blue] \"{jobPath}\" [/]");
+            MarkupLine($"[yellow on green] resuming job [/][yellow on blue] \"{jobPath}\" [/]");
             return File.ReadLines(o.Job);
         } else {
-            AnsiConsole.MarkupLine($"[yellow on red] starting job [/][yellow on blue] \"{jobPath}\" [/]");
+            MarkupLine($"[yellow on red] starting job [/][yellow on blue] \"{jobPath}\" [/]");
         }
     }
     var options = new EnumerationOptions {
@@ -224,10 +229,10 @@ string Size(long bytes, int unit = 1024) {
 }
 
 ConfirmResult Confirm(string msg) {
-    AnsiConsole.MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
+    MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
     ConsoleKey key;
-    while (!ConfirmKeys.Map.ContainsKey(key = Console.ReadKey(true).Key)) { }
-    AnsiConsole.MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
+    while (!ConfirmKeys.Map.ContainsKey(key = System.Console.ReadKey(true).Key)) { }
+    MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
     return ConfirmKeys.Map[key];
 }
 

@@ -2,7 +2,7 @@
   "profiles": {
     "imgsizer": {
       "commandName": "Project",
-      "commandLineArgs": "*.jpg -w 400 -r -d resized -s off --help\r\n"
+      "commandLineArgs": "*.jpg -w 400 -r -d resized -s off \r\n"
     }
   }
 }

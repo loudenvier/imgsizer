@@ -5,9 +5,12 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ByteSize" Version="2.1.1" />
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="PhotoSauce.MagicScaler" Version="0.13.2" />
     <PackageReference Include="Spectre.Console" Version="0.46.0" />

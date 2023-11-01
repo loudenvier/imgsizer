@@ -5,6 +5,10 @@ using static Spectre.Console.AnsiConsole;
 using Spectre.Console.Json;
 using System.Diagnostics;
 using System.Text.Json;
+using ByteSizeLib;
+using System.ComponentModel;
+using System.Globalization;
+using System.Text.Json.Serialization;
 
 var start = Stopwatch.GetTimestamp();
 var watch = Stopwatch.StartNew();
@@ -12,6 +16,9 @@ var escHit = false;
 int count = 0, exitCode = 0, remainingFilesCount = 0;
 long totalBytes = 0, totalResizedBytes = 0;
 StatusContext statusContext;
+
+// Need to add our ByteSize TypeConverter for proper command line parsing
+TypeDescriptor.AddAttributes(typeof(ByteSize), new TypeConverterAttribute(typeof(ByteSizeTypeConverter)));
 
 // Let's welcome our user...
 Write(new FigletText("imgsizer"));
@@ -50,6 +57,16 @@ return exitCode;
 // END OF PROGRAM
 
 void Resize(Options o) {
+    // get source dir and pattern from Source argument (uses current dir if no directory is passed)
+    var dir = Path.GetDirectoryName(o.Source);
+    if (string.IsNullOrEmpty(dir))
+        dir = Directory.GetCurrentDirectory();
+    var filter = Path.GetFileName(o.Source);
+    // guarantees destination is a full path
+    o.Destination = Path.GetFullPath(o.Destination ?? dir);
+    // if source == destination this is an "inplace" process 
+    o.Inplace = o.Destination == Path.GetFullPath(dir);
+
     // shows user which options are being used by the program
     MarkupLine($"Options: ");
     Write(new JsonText(o.ToString()));
@@ -60,16 +77,6 @@ void Resize(Options o) {
         ResizeFile(o.Source, o);
         return;
     }
-
-    // get source dir and pattern from Source argument (uses current dir if no directory is passed)
-    var dir = Path.GetDirectoryName(o.Source);
-    if (string.IsNullOrEmpty(dir))
-        dir = Directory.GetCurrentDirectory();
-    var filter = Path.GetFileName(o.Source);
-    // guarantees destination is a full path
-    o.Destination = Path.GetFullPath(o.Destination ?? "");
-    // if source == destination this is an "inplace" process 
-    o.Inplace = o.Destination == Path.GetFullPath(dir);
 
     var remainingJobFiles = new List<string>();
     foreach (var file in EnumerateFiles(dir, filter, o)) {
@@ -121,63 +128,69 @@ void ResizeFile(string filename, Options o) {
     Markup($"[gray]Processing:[/] ");
     Write(new TextPath($"{fi.FullName}..."));
 
-    // guarantees destination dir exists
-    var relativeFilename = GetRelativePath(filename, o); // maintains same dir hierarchy
-    var dest = Path.Combine(o.Destination ?? "", relativeFilename);
-    if (!o.WhatIf) 
-        ForceDirectory(dest);
-
-    // check if it needs to ask to overwrite destination (will compute the size even if skipped)
-    var confirmation = o switch 
-    { 
-        { WhatIf: true}                             => ConfirmResult.Yes,
-        { NeverOverwrite: true }                    => ConfirmResult.No, 
-        { Overwrite: false } when File.Exists(dest) => Confirm($"The destination file already exists. Overwrite it? "),
-        _                                           => ConfirmResult.Yes,
-    };
     long resizedBytes = 0;
-    switch (confirmation) {
-        case ConfirmResult.No:
-            MarkupLine($"[black on red] File skipped! [/]");
-            break;
-        case ConfirmResult.Escape:
-            escHit = true;
-            return;
-        case ConfirmResult.Never:
-            o.NeverOverwrite = true;
-            break;
-        case ConfirmResult.Always:
-            // don't confir to overwrite anymore
-            o.Overwrite = true;
-            goto case ConfirmResult.Yes;
-        case ConfirmResult.Yes: 
-            {
-                using Stream stm = o.Inplace || o.WhatIf ? new MemoryStream() : new FileStream(dest, FileMode.Create);
-                MagicImageProcessor.ProcessImage(filename, stm, new ProcessImageSettings {
-                    Width = o.Width ?? 0,
-                    Height = o.Height ?? 0,
-                    ResizeMode = CropScaleMode.Max,
-                    HybridMode = o.ScaleMode,
+    if (!o.SizeThreshold.HasValue || bytes >= o.SizeThreshold.Value.Bytes) {
 
-                });
-                if (!o.WhatIf) {
-                    if (stm is MemoryStream mem) {
-                        stm.Position = 0;
-                        File.WriteAllBytes(dest, mem.ToArray());
+        // guarantees destination dir exists
+        var relativeFilename = GetRelativePath(filename, o); // maintains same dir hierarchy
+        var dest = Path.Combine(o.Destination ?? "", relativeFilename);
+        if (!o.WhatIf)
+            ForceDirectory(dest);
+
+        // check if it needs to ask to overwrite destination (will compute the size even if skipped)
+        var confirmation = o switch { { WhatIf: true } => ConfirmResult.Yes, { NeverOverwrite: true } => ConfirmResult.No, { Overwrite: false } when File.Exists(dest) => Confirm($"The destination file already exists. Overwrite it? "),
+            _ => ConfirmResult.Yes,
+        };
+        switch (confirmation) {
+            case ConfirmResult.No:
+                MarkupLine($"[black on red] File skipped! [/]");
+                break;
+            case ConfirmResult.Escape:
+                escHit = true;
+                return;
+            case ConfirmResult.Never:
+                o.NeverOverwrite = true;
+                break;
+            case ConfirmResult.Always:
+                // don't confirm to overwrite anymore
+                o.Overwrite = true;
+                goto case ConfirmResult.Yes;
+            case ConfirmResult.Yes: {
+                    using Stream stm = o.Inplace || o.WhatIf ? new MemoryStream() : new FileStream(dest, FileMode.Create);
+                    try {
+                        MagicImageProcessor.ProcessImage(filename, stm, new ProcessImageSettings {
+                            Width = o.Width ?? 0,
+                            Height = o.Height ?? 0,
+                            ResizeMode = CropScaleMode.Max,
+                            HybridMode = o.ScaleMode,
+                        });
+                        if (!o.WhatIf) {
+                            if (stm is MemoryStream mem) {
+                                stm.Position = 0;
+                                File.WriteAllBytes(dest, mem.ToArray());
+                            }
+                        } else {
+                            // if it's whatif :-) resized bytes will equal the memory stream length
+                            resizedBytes = stm.Length;
+                        }
+                    } catch (Exception e) {
+                        resizedBytes = 0;
+                        MarkupLine($" [yellow on red] ERROR [/]: [red] {e.Message} [/]");
                     }
-                } else {
-                    resizedBytes = stm.Length;
+                    stm.Flush();
+                    stm.Close();
                 }
-                stm.Flush();
-                stm.Close();
-            }
-            break;
+                break;
+        }
+        if (!o.WhatIf)
+            // if not "whatif" resized bytes will be the actual resulting file length
+            resizedBytes = new FileInfo(dest).Length;
+        MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
+    } else {
+        MarkupLine($" [[[purple]skipped[/]]] [olive] {Size(bytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
     }
-    if (!o.WhatIf) 
-        resizedBytes = new FileInfo(dest).Length;
     totalResizedBytes += resizedBytes;
 
-    MarkupLine($" [[[blue]done[/]]] [olive] {Size(bytes)} [/]resized to[yellow] {Size(resizedBytes)} [/] [gray]({watch.Elapsed.Milliseconds}ms)[/]");
     count++;
 }
 
@@ -221,12 +234,8 @@ void ForceDirectory(string? dirOrFileName) {
 string GetRelativePath(string filename, Options o) =>
     Path.GetRelativePath(Path.GetDirectoryName(Path.GetFullPath(o.Source)) ?? "", Path.GetFullPath(filename));
 
-string Size(long bytes, int unit = 1024) {
-    // converts bytes to the "best-fit" unit of measurement (change unit to 1000 to use the new 1000 B =1 MB storage standard)
-    if (bytes < unit) return $"{bytes} B"; 
-    var exp = (int)(Math.Log(bytes) / Math.Log(unit));
-    return $"{bytes / Math.Pow(unit, exp):F2} {("KMGTPE")[exp - 1]}B";
-}
+// converts bytes to the "best-fit" unit of measurement 
+string Size(long bytes) => ByteSize.FromBytes(bytes).ToString();
 
 ConfirmResult Confirm(string msg) {
     MarkupLine($"[yellow] {msg} [/]([yellow on green]<Y>[/]es, [yellow on red]<N>[/]o, [yellow on blue]<A>[/]lways, n[yellow on purple]<E>[/]ver, [black on yellow]<ESC>[/])");
@@ -234,6 +243,19 @@ ConfirmResult Confirm(string msg) {
     while (!ConfirmKeys.Map.ContainsKey(key = System.Console.ReadKey(true).Key)) { }
     MarkupLine($"[black on white] {key} [/][white on gray] was pressed. [/]");
     return ConfirmKeys.Map[key];
+}
+
+enum ConfirmResult { Yes, No, Always, Never, Escape }
+
+static class ConfirmKeys
+{
+    internal readonly static Dictionary<ConsoleKey, ConfirmResult> Map = new() {
+        [ConsoleKey.Y] = ConfirmResult.Yes,
+        [ConsoleKey.N] = ConfirmResult.No,
+        [ConsoleKey.A] = ConfirmResult.Always,
+        [ConsoleKey.E] = ConfirmResult.Never,
+        [ConsoleKey.Escape] = ConfirmResult.Escape,
+    };
 }
 
 /// <summary>
@@ -249,7 +271,7 @@ public class Options
     public int? Width { get; set; }
     [Option('h', "height", HelpText = "Image's target height")]
     public int? Height { get; set; }
-    [Option('d', "dest", Default = "resized", HelpText = "Output path/directory (if it's '.' performs inplace resizing)")]
+    [Option('d', "dest", HelpText = "Output path/directory (if it's omitted will perform inplace resizing)")]
     public string? Destination { get; set; } 
     [Option('o', "overwrite", Default = false, HelpText = "Automatically overwrites destination files")]
     public bool Overwrite { get; set; }
@@ -263,20 +285,25 @@ public class Options
     [Option('s', "scalemode", Default = HybridScaleMode.Off, HelpText = "(off, favorquality, favorspeed, turbo) Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations.")]
     public HybridScaleMode ScaleMode { get; set; }
 
+    [Option('t', "threshold", HelpText = "Minimum file size to resize (10kb, 1MB...)")]
+    [JsonIgnore]
+    public ByteSize? SizeThreshold { get; set; }
+    public string? Threshold => SizeThreshold?.ToString();
+
     public bool HasJob() => !String.IsNullOrWhiteSpace(Job);
 
     public override string ToString() => JsonSerializer.Serialize(this);
 }
 
-enum ConfirmResult { Yes, No, Always, Never, Escape }
-
-static class ConfirmKeys
+// ByteSize converting (needed for automatic command line parsing)
+public class ByteSizeTypeConverter : TypeConverter
 {
-    public static Dictionary<ConsoleKey, ConfirmResult> Map { get; } = new() {
-        [ConsoleKey.Y] = ConfirmResult.Yes,
-        [ConsoleKey.N] = ConfirmResult.No,
-        [ConsoleKey.A] = ConfirmResult.Always,
-        [ConsoleKey.E] = ConfirmResult.Never,
-        [ConsoleKey.Escape] = ConfirmResult.Escape,
-    };
+    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) =>
+        sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+
+    public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value) =>
+        value is string s ? ByteSize.Parse(s) : base.ConvertFrom(context, culture, value);
+    
+    public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType) =>
+        value is ByteSize ? value.ToString() : base.ConvertTo(context, culture, value, destinationType);
 }

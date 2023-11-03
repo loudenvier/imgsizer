@@ -1,5 +1,7 @@
 ﻿using CommandLine;
 using PhotoSauce.MagicScaler;
+using PhotoSauce.NativeCodecs.Libjpeg;
+using PhotoSauce.NativeCodecs.Libpng;
 using Spectre.Console;
 using static Spectre.Console.AnsiConsole;
 using Spectre.Console.Json;
@@ -66,6 +68,10 @@ void Resize(Options o) {
     o.Destination = Path.GetFullPath(o.Destination ?? dir);
     // if source == destination this is an "inplace" process 
     o.Inplace = o.Destination == Path.GetFullPath(dir);
+    // constraining quality to the 1..100 range
+    o.Quality = Math.Max(1, Math.Min(100, o.Quality));
+
+    ConfigureEncoderOptions(o);
 
     // shows user which options are being used by the program
     MarkupLine($"Options: ");
@@ -111,6 +117,22 @@ void Resize(Options o) {
     }
 }
 
+void ConfigureEncoderOptions(Options o) {
+    CodecManager.Configure(codecs => {
+        codecs.UseLibjpeg();
+        codecs.UseLibpng();
+
+        var jpeg = codecs.OfType<IImageEncoderInfo>().First(c => c.MimeTypes.FirstOrDefault() == ImageMimeTypes.Jpeg);
+
+        // change the default options on the existing definition
+        var prop = jpeg.GetType().GetProperty(nameof(IImageEncoderInfo.DefaultOptions));
+        prop!.SetValue(jpeg, new JpegOptimizedEncoderOptions(
+            Quality: o.Quality, 
+            Subsample: o.ChromaSubsample, 
+            Progressive: o.ProgressiveMode));
+    });
+}
+
 void ResizeFile(string filename, Options o) {
     if (!File.Exists(filename)) {
         MarkupLine($"[yellow on red] {filename} [/][white on gray] does not exist [/]\r\n");
@@ -128,7 +150,7 @@ void ResizeFile(string filename, Options o) {
     Markup($"[gray]Processing:[/] ");
     Write(new TextPath($"{fi.FullName}..."));
 
-    long resizedBytes = 0;
+    long resizedBytes = bytes;
     if (!o.SizeThreshold.HasValue || bytes >= o.SizeThreshold.Value.Bytes) {
 
         // guarantees destination dir exists
@@ -162,7 +184,7 @@ void ResizeFile(string filename, Options o) {
                             Width = o.Width ?? 0,
                             Height = o.Height ?? 0,
                             ResizeMode = CropScaleMode.Max,
-                            HybridMode = o.ScaleMode,
+                            HybridMode = o.ScaleMode
                         });
                         if (!o.WhatIf) {
                             if (stm is MemoryStream mem) {
@@ -284,12 +306,18 @@ public class Options
     public bool WhatIf { get; set; }
     [Option('s', "scalemode", Default = HybridScaleMode.Off, HelpText = "(off, favorquality, favorspeed, turbo) Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations.")]
     public HybridScaleMode ScaleMode { get; set; }
-
     [Option('t', "threshold", HelpText = "Minimum file size to resize (10kb, 1MB...)")]
     [JsonIgnore]
     public ByteSize? SizeThreshold { get; set; }
     public string? Threshold => SizeThreshold?.ToString();
-
+    [Option('q', "quality", Default = 80, HelpText = "Defines perceptual output quality for lossy compressions (1..100)")]
+    public int Quality { get; set; }
+    [Option('c', "chroma", Default = ChromaSubsampleMode.Subsample420, HelpText = "Defines the Chroma Subsample mode to use for encoding")]
+    public ChromaSubsampleMode ChromaSubsample { get; set; }
+    [JsonIgnore]
+    [Option('p', "progressive", Default = PhotoSauce.NativeCodecs.Libjpeg.JpegProgressiveMode.None, HelpText = "Defines the JPEG Progressive mode to use for enconding")]
+    public JpegProgressiveMode ProgressiveMode { get; set; }
+    public string JpegProgressiveMode => ProgressiveMode.ToString();
     public bool HasJob() => !String.IsNullOrWhiteSpace(Job);
 
     public override string ToString() => JsonSerializer.Serialize(this);

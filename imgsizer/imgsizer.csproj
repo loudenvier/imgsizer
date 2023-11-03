@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -12,7 +12,9 @@
   <ItemGroup>
     <PackageReference Include="ByteSize" Version="2.1.1" />
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="PhotoSauce.MagicScaler" Version="0.13.2" />
+    <PackageReference Include="PhotoSauce.MagicScaler" Version="0.14.0" />
+    <PackageReference Include="PhotoSauce.NativeCodecs.Libjpeg" Version="3.0.0-preview1" />
+    <PackageReference Include="PhotoSauce.NativeCodecs.Libpng" Version="1.6.39-preview1" />
     <PackageReference Include="Spectre.Console" Version="0.46.0" />
     <PackageReference Include="Spectre.Console.Json" Version="0.46.0" />
   </ItemGroup>

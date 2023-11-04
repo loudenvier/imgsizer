@@ -64,6 +64,9 @@ return exitCode;
 // END OF PROGRAM
 
 void Resize(Options o) {
+    // if source is a directory will add *.* to the pattern
+    if (Directory.Exists(o.Source))
+        o.Source = Path.Combine(o.Source, "*.*");
     // get source dir and pattern from Source argument (uses current dir if no directory is passed)
     var dir = Path.GetDirectoryName(o.Source);
     if (string.IsNullOrEmpty(dir))

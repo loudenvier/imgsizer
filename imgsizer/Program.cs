@@ -14,6 +14,7 @@ using System.Text.Json.Serialization;
 
 var start = Stopwatch.GetTimestamp();
 var watch = Stopwatch.StartNew();
+var options = new Options();
 var escHit = false;
 int count = 0, exitCode = 0, remainingFilesCount = 0;
 long totalBytes = 0, totalResizedBytes = 0;
@@ -40,18 +41,22 @@ Status()
             cfg.HelpWriter = System.Console.Out;
         });
         parser.ParseArguments<Options>(args)
-            .WithParsed(o => Resize(o))
+            .WithParsed(o => Resize(options = o))
             .WithNotParsed(e => exitCode = 1);
     });
 
 if (exitCode == 0) {
     // wrap it up and display ending message
-    var remaining = remainingFilesCount == 0 ? "" : $"[white on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
-    MarkupLine(
-        $"\r\n[black on gray] files processed [/][yellow on green] {count} [/]" +
-        $"[black on gray] total size [/][yellow on purple] {Size(totalBytes)} [/]" +
-        $"[black on gray] resized size [/][yellow on maroon] {Size(totalResizedBytes)} [/]{remaining}" +
-        $"[black on gray] runnnig time [/][yellow on darkblue] {Stopwatch.GetElapsedTime(start)} [/]");
+    if (options.CreateJobOnly) {
+        MarkupLine($"\r\n[black on gray] job created with [/][yellow on green] {remainingFilesCount} [/][black on gray] files [/]");
+    } else {
+        var remaining = remainingFilesCount == 0 ? "" : $"[black on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
+        MarkupLine(
+            $"\r\n[black on gray] files processed [/][yellow on green] {count} [/]" +
+            $"[black on gray] total size [/][yellow on purple] {Size(totalBytes)} [/]" +
+            $"[black on gray] resized size [/][yellow on maroon] {Size(totalResizedBytes)} [/]{remaining}" +
+            $"[black on gray] runnnig time [/][yellow on darkblue] {Stopwatch.GetElapsedTime(start)} [/]");
+    }
 }
 
 return exitCode;
@@ -97,7 +102,7 @@ void Resize(Options o) {
                 // if no job name was provided just quit processing
                 break;
         }
-        if (escHit) {
+        if (escHit || o.CreateJobOnly) {
             // if <ESC> was hit just capture each remaining file name without processing (resizing) it
             remainingJobFiles.Add(file);
             statusContext.Status($"[yellow on red] {++remainingFilesCount} [/][red on yellow] files remaining... [/]");
@@ -106,7 +111,7 @@ void Resize(Options o) {
             ResizeFile(file, o);
         }
     }
-    if (escHit && o.HasJob()) {
+    if ((o.CreateJobOnly || escHit) && o.HasJob()) {
         // TODO: Could add some more info from the job (how many files were processed, time taken, etc.)
         File.WriteAllLines(o.Job!, remainingJobFiles);
         MarkupLine($"[default]Job saved to: [/][yellow]\"{Path.GetFullPath(o.Job!)}\" [/]");
@@ -220,11 +225,11 @@ IEnumerable<string> EnumerateFiles(string dir, string filter, Options o) {
     // we enumerate the contents of the job file if it exists, or else the directory contents
     if (o.HasJob()) {
         var jobPath = Path.GetFullPath(o.Job!);
-        if (File.Exists(o.Job)) {
+        if (File.Exists(o.Job) && !o.CreateJobOnly) {
             MarkupLine($"[yellow on green] resuming job [/][yellow on blue] \"{jobPath}\" [/]");
             return File.ReadLines(o.Job);
         } else {
-            MarkupLine($"[yellow on red] starting job [/][yellow on blue] \"{jobPath}\" [/]");
+            MarkupLine($"[yellow on red] {(o.CreateJobOnly ? "creating" : "starting")} job [/][yellow on blue] \"{jobPath}\" [/]");
         }
     }
     var options = new EnumerationOptions {
@@ -302,6 +307,8 @@ public class Options
     public bool Recursive { get; set; }
     [Option('j', "job", Default = null, HelpText = "Allows pausing and resuming with named \"jobs\"")]
     public string? Job { get; set; }
+    [Option("createjob", Default = false, HelpText = "Only create the job by enumerating the files to be processed")]
+    public bool CreateJobOnly { get; set; }
     [Option("whatif", HelpText = "Runs in simulation mode (output isn't written to disk)")]
     public bool WhatIf { get; set; }
     [Option('s', "scalemode", Default = HybridScaleMode.Off, HelpText = "(off, favorquality, favorspeed, turbo) Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations.")]

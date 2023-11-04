@@ -22,11 +22,11 @@ Resizes `*.jpg` images in the `img` subfolder, recursing its folder structure, c
 
 `imgsizer img\*.jpg -r -w 400 -h 600 -o`
 
-Same as the previous example but does not asks for confirmation to overwrite source files.
+Same as the previous example but does not ask for confirmation to overwrite source files.
 
 `imgsizer *.jpg -w 400 -h 400 -t 200KB -o`
 
-Resizes `*.jpg` images in the current folder, constraining their larger dimension to 400 pixels, filtering out all images larger than 200 KB (`-t|--threshold` option). Doesn't asks for confirmation to overwrite processed files.
+Resizes `*.jpg` images in the current folder, constraining their larger dimension to 400 pixels, filtering out all images larger than 200 KB (`-t|--threshold` option). Doesn't ask for confirmation to overwrite processed files.
 
 ### Full options
 ```

@@ -91,6 +91,12 @@ Copyright (C) 2023 imgsizer
 * `Pad`: Pads the image (when enlarging) to the exact dimensions specified (uses `--matte-color` for padding in non-transparent image formats)
 * `Max` (default): The same as Contain but do not enlarge smaller images.
 
+`--matte-color`: Specifies the color to use when padding and/or for transparent pixels on non-transparent formats. 
+
+You can specify the color in a variety of formats:
+* Color name: `Brown`, `Red`, `DarkOliveGreen`, etc. (any .NET valid color name)
+* Hex color notation: `#FFA080` without alpha, or `#D0FFA080` with alpha (ARGB)
+* Decimal color notation: `255,255,160` without alpha, or `100,255,255,160` with alpha (A,R,G,B). _If using spaces after the commas you must quote the value:_ `"200, 255, 160"`
 
 ## Screenshots
 

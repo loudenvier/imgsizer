@@ -84,12 +84,17 @@ Copyright (C) 2023 imgsizer
 ```
 
 #### Advanced Options
-`-m | --mode`: Specifies the Crop Scale Mode
-* `Max` (default): Contains the image into the specified dimensions (`-w`/`-h`), avoiding any cropping. **Never** enlarges dimensions. 
-* `Crop`: Crops the image to the specified dimensions  (centers the crop around the `-a`|`--anchor` option)
+`-t` | `--threshold`: Minimum size to process file
+
+This flag allows you to skip files smaller than the specified size. You can specify the size using common binary prefixes: 100KB, 1MB, 100KiB, 1,5MB, etc.
+_If using spaces after the number you must quote it:_ `"1,5 MiB"`
+
+`-m` | `--mode`: Specifies the Crop Scale Mode
+* `Max` (default): Contains the image into the specified dimensions (`-w`/`-h`), avoiding any cropping and keeping the original aspect-ratio. **Never** enlarges dimensions. 
+* `Crop`: Crops the image to the specified dimensions (centers the crop around the `-a`|`--anchor` option). Will enlarge or shrink images if needed.
 * `Contain`: The same as `Max` but will enlarge smaller dimensions.
-* `Stretch`: Stretch the image to the exact dimensions specified. Do not preserve the original aspect-ratio.
-* `Pad`: Pads the image (when enlarging) to the exact dimensions specified (uses `--matte-color` for padding in non-transparent image formats)
+* `Stretch`: Stretches the image to the exact dimensions specified. Do not preserve the original aspect-ratio.
+* `Pad`: Add borders to the image to make it fit in the exact specified dimensions (uses `--matte-color` for padding)
 
 `--matte-color`: Specifies the color to use when padding and/or for transparent pixels on non-transparent formats. 
 

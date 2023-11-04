@@ -48,10 +48,10 @@ if (exitCode == 0) {
     // wrap it up and display ending message
     var remaining = remainingFilesCount == 0 ? "" : $"[white on gray] files remaining [/][yellow on maroon] {remainingFilesCount} [/]";
     MarkupLine(
-        $"\r\n[white on gray] files processed [/][yellow on green] {count} [/]" +
-        $"[white on gray] total size [/][yellow on purple] {Size(totalBytes)} [/]" +
-        $"[white on gray] resized size [/][yellow on navy] {Size(totalResizedBytes)} [/]{remaining}" +
-        $"[white on gray] runnnig time [/][yellow on blue] {Stopwatch.GetElapsedTime(start)} [/]");
+        $"\r\n[black on gray] files processed [/][yellow on green] {count} [/]" +
+        $"[black on gray] total size [/][yellow on purple] {Size(totalBytes)} [/]" +
+        $"[black on gray] resized size [/][yellow on maroon] {Size(totalResizedBytes)} [/]{remaining}" +
+        $"[black on gray] runnnig time [/][yellow on darkblue] {Stopwatch.GetElapsedTime(start)} [/]");
 }
 
 return exitCode;
@@ -128,8 +128,8 @@ void ConfigureEncoderOptions(Options o) {
         var prop = jpeg.GetType().GetProperty(nameof(IImageEncoderInfo.DefaultOptions));
         prop!.SetValue(jpeg, new JpegOptimizedEncoderOptions(
             Quality: o.Quality, 
-            Subsample: o.ChromaSubsample, 
-            Progressive: o.ProgressiveMode));
+            Subsample: o.ChromaSubsampleMode, 
+            Progressive: o.JpegProgressiveMode));
     });
 }
 
@@ -312,15 +312,15 @@ public class Options
     public string? Threshold => SizeThreshold?.ToString();
     [Option('q', "quality", Default = 80, HelpText = "Defines perceptual output quality for lossy compressions (1..100)")]
     public int Quality { get; set; }
-    [Option('c', "chroma", Default = ChromaSubsampleMode.Subsample420, HelpText = "Defines the Chroma Subsample mode to use for encoding")]
-    public ChromaSubsampleMode ChromaSubsample { get; set; }
-    [JsonIgnore]
+    [Option('c', "chroma", Default = PhotoSauce.MagicScaler.ChromaSubsampleMode.Subsample420, HelpText = "Defines the Chroma Subsample mode to use for encoding")]
+    public ChromaSubsampleMode ChromaSubsampleMode { get; set; }
     [Option('p', "progressive", Default = PhotoSauce.NativeCodecs.Libjpeg.JpegProgressiveMode.None, HelpText = "Defines the JPEG Progressive mode to use for enconding")]
-    public JpegProgressiveMode ProgressiveMode { get; set; }
-    public string JpegProgressiveMode => ProgressiveMode.ToString();
+    public JpegProgressiveMode JpegProgressiveMode { get; set; }
     public bool HasJob() => !String.IsNullOrWhiteSpace(Job);
-
-    public override string ToString() => JsonSerializer.Serialize(this);
+    public override string ToString() => JsonSerializer.Serialize(this, new JsonSerializerOptions { Converters = {
+            new JsonStringEnumConverter(),
+        }
+    });
 }
 
 // ByteSize converting (needed for automatic command line parsing)

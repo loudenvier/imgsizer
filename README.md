@@ -85,9 +85,9 @@ Copyright (C) 2023 imgsizer
 
 #### Advanced Options
 `-m | --mode`: Specifies the Crop Scale Mode
-* `Max` (default): The same as Contain but do not enlarge smaller images.
-* `Crop`: Crops the image to the dimensions specified in -w and -h (centers the crop around the `-a|--anchor` option)
-* `Contain`: Contains the image into the dimensions specified, avoiding cropping. Will enlarge smaller images.
+* `Max` (default): Contains the image into the specified dimensions (`-w`/`-h`), avoiding any cropping. **Never** enlarges dimensions. 
+* `Crop`: Crops the image to the specified dimensions  (centers the crop around the `-a`|`--anchor` option)
+* `Contain`: The same as `Max` but will enlarge smaller dimensions.
 * `Stretch`: Stretch the image to the exact dimensions specified. Do not preserve the original aspect-ratio.
 * `Pad`: Pads the image (when enlarging) to the exact dimensions specified (uses `--matte-color` for padding in non-transparent image formats)
 

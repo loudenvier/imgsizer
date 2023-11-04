@@ -94,7 +94,7 @@ _If using spaces after the number you must quote it:_ `"1,5 MiB"`
 * `Crop`: Crops the image to the specified dimensions (centers the crop around the `-a`|`--anchor` option). Will enlarge or shrink images if needed.
 * `Contain`: The same as `Max` but will enlarge smaller dimensions.
 * `Stretch`: Stretches the image to the exact dimensions specified. Do not preserve the original aspect-ratio.
-* `Pad`: Add borders to the image to make it fit in the exact specified dimensions (uses `--matte-color` for padding)
+* `Pad`: Add borders to the image to make it fit within the exact specified dimensions (uses `--matte-color` for padding). The _useful area_ of the resulting image (not considering the padding) preserves the original aspect-ratio.
 
 `--matte-color`: Specifies the color to use when padding and/or for transparent pixels on non-transparent formats. 
 

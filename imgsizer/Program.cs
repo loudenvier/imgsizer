@@ -191,8 +191,10 @@ void ResizeFile(string filename, Options o) {
                         MagicImageProcessor.ProcessImage(filename, stm, new ProcessImageSettings {
                             Width = o.Width ?? 0,
                             Height = o.Height ?? 0,
-                            ResizeMode = CropScaleMode.Max,
-                            HybridMode = o.ScaleMode
+                            ResizeMode = o.ResizeMode,
+                            Anchor = o.Anchor,
+                            HybridMode = o.ScaleMode,
+                            MatteColor = o.BackColor,
                         });
                         if (!o.WhatIf) {
                             if (stm is MemoryStream mem) {
@@ -301,7 +303,7 @@ public class Options
     public int? Width { get; set; }
     [Option('h', "height", HelpText = "Image's target height")]
     public int? Height { get; set; }
-    [Option('d', "dest", HelpText = "Output path/directory (if it's omitted will perform inplace resizing)")]
+    [Option('d', "dest", HelpText = "Output path/directory (if omitted will perform inplace resizing)")]
     public string? Destination { get; set; } 
     [Option('o', "overwrite", Default = false, HelpText = "Automatically overwrites destination files")]
     public bool Overwrite { get; set; }
@@ -310,11 +312,16 @@ public class Options
     public bool Recursive { get; set; }
     [Option('j', "job", Default = null, HelpText = "Allows pausing and resuming with named \"jobs\"")]
     public string? Job { get; set; }
-    [Option("createjob", Default = false, HelpText = "Only create the job by enumerating the files to be processed")]
+    [Option("createjob", Default = false, HelpText = "Only creates the job by enumerating the files to be processed")]
     public bool CreateJobOnly { get; set; }
-    [Option("whatif", HelpText = "Runs in simulation mode (output isn't written to disk)")]
-    public bool WhatIf { get; set; }
-    [Option('s', "scalemode", Default = HybridScaleMode.Off, HelpText = "(off, favorquality, favorspeed, turbo) Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations.")]
+    [Option('m', "mode", Default = CropScaleMode.Max, HelpText = "Specifies the resize/crop scale mode to use (Crop, Contain, Stretch, Pad, Max)")]
+    public CropScaleMode ResizeMode { get; set; }
+    [Option('a', "anchor", Default = CropAnchor.Center, HelpText = "Specifies the horizontal and vertical anchor positions for auto cropping (Center, Top, Bottom, Left, Right) (pass multiple values separated by commas)")]
+    public CropAnchor Anchor { get; set; }
+    [JsonIgnore, Option("matte-color", HelpText = "(Default: Black) Specifies the color to use when padding or converting transparency to non-transparent formats (Use names or values: White; Brown; #FFFFA0; 255,255,160...)")] 
+    public System.Drawing.Color BackColor { get; set; } = System.Drawing.Color.Black;
+    public string MatteColor => BackColor.ToString()[6..];
+    [Option("hybrid-mode", Default = HybridScaleMode.Off, HelpText = "Defines the mode that control speed vs. quality trade-offs for high-ratio scaling operations (off, favorquality, favorspeed, turbo)")]
     public HybridScaleMode ScaleMode { get; set; }
     [Option('t', "threshold", HelpText = "Minimum file size to resize (10kb, 1MB...)")]
     [JsonIgnore]
@@ -322,14 +329,15 @@ public class Options
     public string? Threshold => SizeThreshold?.ToString();
     [Option('q', "quality", Default = 80, HelpText = "Defines perceptual output quality for lossy compressions (1..100)")]
     public int Quality { get; set; }
-    [Option('c', "chroma", Default = PhotoSauce.MagicScaler.ChromaSubsampleMode.Subsample420, HelpText = "Defines the Chroma Subsample mode to use for encoding")]
+    [Option('c', "chroma", Default = ChromaSubsampleMode.Subsample420, HelpText = "Defines the Chroma Subsample mode to use for encoding")]
     public ChromaSubsampleMode ChromaSubsampleMode { get; set; }
-    [Option('p', "progressive", Default = PhotoSauce.NativeCodecs.Libjpeg.JpegProgressiveMode.None, HelpText = "Defines the JPEG Progressive mode to use for enconding")]
+    [Option('p', "progressive", Default = JpegProgressiveMode.None, HelpText = "Defines the JPEG Progressive mode to use for enconding")]
     public JpegProgressiveMode JpegProgressiveMode { get; set; }
-    public bool HasJob() => !String.IsNullOrWhiteSpace(Job);
-    public override string ToString() => JsonSerializer.Serialize(this, new JsonSerializerOptions { Converters = {
-            new JsonStringEnumConverter(),
-        }
+    [Option("whatif", HelpText = "Runs in simulation mode (output isn't written to disk)")]
+    public bool WhatIf { get; set; }
+    public bool HasJob() => !string.IsNullOrWhiteSpace(Job);
+    public override string ToString() => JsonSerializer.Serialize(this, new JsonSerializerOptions { 
+        Converters = { new JsonStringEnumConverter(), }
     });
 }
 

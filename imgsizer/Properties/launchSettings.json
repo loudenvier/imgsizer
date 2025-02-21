@@ -2,7 +2,7 @@
   "profiles": {
     "imgsizer": {
       "commandName": "Project",
-      "commandLineArgs": "img/*.jpg -w 400 -r -s off -t 200kb\r\n"
+      "commandLineArgs": "img/*.jpg -w 400 --hybrid-mode off -t 200kb\r\n"
     }
   }
 }
